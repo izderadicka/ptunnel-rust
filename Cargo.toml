@@ -1,0 +1,18 @@
+[package]
+name = "ptunnel"
+version = "0.1.0"
+authors = ["Ivan <ivan.zderadicka@gmail.com>"]
+description = "program that tunnels connections through https proxy"
+
+[dependencies]
+log = "0.3"
+env_logger = "0.3"
+clap = "2"
+lazy_static = "0.2"
+quick-error = "1.2"
+url = "1.6"
+tokio-core = "0.1"
+tokio-io = "0.1"
+futures = "0.1"
+tokio-dns-unofficial = "0.1"
+

@@ -4,6 +4,7 @@ use log::{LogLevelFilter};
 use std::str::FromStr;
 use std::env;
 use url::Url;
+use tokio_dns::{ToEndpoint, Endpoint};
 
 lazy_static! {
     static ref PROGRAM_NAME:&'static str = option_env!("CARGO_PKG_NAME").unwrap_or("ptunnel");
@@ -37,13 +38,19 @@ pub struct Tunnel {
     pub remote_host: String
 }
 
+impl <'a>ToEndpoint<'a> for &'a Tunnel {
+    fn to_endpoint(self) -> ::std::io::Result<Endpoint<'a>> {
+        Ok(Endpoint::Host(&self.remote_host, self.remote_port))
+    }
+}
+
 impl Tunnel {
     pub fn remote(&self) -> String {
         format!("{}:{}", self.remote_host, self.remote_port)
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Proxy {
     pub host: String,
     pub port: u16

@@ -10,6 +10,7 @@ extern crate quick_error;
 extern crate url;
 extern crate futures;
 extern crate tokio_core;
+#[macro_use]
 extern crate tokio_io;
 extern crate tokio_dns;
 
@@ -39,7 +40,7 @@ fn main() {
     let mut servers: Box<Future<Item=(), Error=std::io::Error>> = Box::new(future::ok(()));
     for t in config.tunnels {
         debug!("Staring tunnel {:?}", t);
-        let server = run_tunnel(reactor.handle(), t);
+        let server = run_tunnel(reactor.handle(), t, config.proxy.clone());
         servers = Box::new(servers.join(server).map(|_| ()));
     }
     

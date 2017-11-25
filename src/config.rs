@@ -5,6 +5,8 @@ use std::str::FromStr;
 use std::env;
 use url::Url;
 use tokio_dns::{ToEndpoint, Endpoint};
+use std::net::IpAddr;
+use data_encoding::BASE64;
 
 lazy_static! {
     static ref PROGRAM_NAME:&'static str = option_env!("CARGO_PKG_NAME").unwrap_or("ptunnel");
@@ -24,6 +26,10 @@ pub enum Error {
     }
 
     InvalidPort(err: ::std::num::ParseIntError) {
+        from()
+    }
+
+    InvalidAddress(err: ::std::net::AddrParseError) {
         from()
     }
 }
@@ -55,11 +61,33 @@ pub struct Proxy {
     pub host: String,
     pub port: u16
 }
+
+#[derive(Debug,Clone)]
+pub struct User {
+    pub name: String,
+    pub password: Option<String>,
+}
+
+impl User {
+    pub fn encoded(&self) -> String {
+        match self.password.as_ref() {
+            None => BASE64.encode(&self.name.as_bytes()),
+            Some(p) => {
+                let s = format!("{}:{}", self.name, p);
+                BASE64.encode(s.as_bytes())
+            }
+        }
+        
+    }
+}
+
 #[derive(Debug)]
 pub struct Config {
     pub log_level: LogLevelFilter,
+    pub local_addr: IpAddr,
     pub proxy: Option<Proxy>,
-    pub tunnels: Vec<Tunnel>
+    pub tunnels: Vec<Tunnel>,
+    pub user: Option<User>
 }
 
 type Parser<'a> = App<'a, 'a>;
@@ -84,13 +112,33 @@ fn create_parser<'a>() -> Parser<'a> {
         .long("verbose")
         .multiple(true)
         .conflicts_with("quiet")
+        .help("verbosity of logging - can be used multiple times to increase verbosity")
         )
+    .arg(Arg::with_name("listen")
+        .short("l")
+        .long("listen")
+        .takes_value(true)
+        .help("local address to listen on - default is 127.0.0.1")
+    )
     .arg(Arg::with_name("proxy")
         .short("p")
         .long("proxy")
         .takes_value(true)
         .value_name("HOST:PORT")
         .help("https proxy (accepting CONNECT method), specify as host:port, if not specified https_proxy environment var is used")
+    )
+    .arg(Arg::with_name("user")
+        .short("U")
+        .long("user")
+        .takes_value(true)
+        .help("Proxy username - for basic authentication to proxy")
+    )
+    .arg(Arg::with_name("password")
+        .short("P")
+        .long("password")
+        .takes_value(true)
+        .help("Proxy user password - for basic authentication to proxy")
+        .requires("user")
     )
     .arg(Arg::with_name("tunnel")
         .value_name("LOCAL_POST:REMOTE_HOST:REMOTE_PORT")
@@ -178,6 +226,12 @@ pub fn parse_args() -> Result<Config>{
     config_log_level(log_level);
     debug!("Arguments are {:?}", args);
 
+    let local_addr = match args.value_of("listen") {
+        None => "127.0.0.1".parse().unwrap(),
+        Some(s) => s.parse()?
+
+    };
+
     let proxy = match args.value_of("proxy") {
         Some(p) => Some(parse_proxy(p)?),
         None => {
@@ -193,7 +247,12 @@ pub fn parse_args() -> Result<Config>{
         tunnels.push(parse_tunnel(t)?)
     }
 
-   Ok(Config{log_level, proxy, tunnels})
+    let user = match args.value_of("user") {
+        None => None,
+        Some(name) => Some(User{name:name.into(), password: args.value_of("password").map(|s| s.into())})
+    };
+
+   Ok(Config{log_level, proxy, tunnels, local_addr, user})
 }
 
 #[cfg(test)]
@@ -226,6 +285,13 @@ mod tests {
             Err(Error::InvalidPort(_)) => (),
             _ => panic!("Should return invalid port error")
 
+        }
     }
+
+    #[test]
+    fn test_user_encoded() {
+        let u = User{name:"Aladdin".into(), password: Some("OpenSesame".into())};
+        let e = u.encoded();
+        assert_eq!("QWxhZGRpbjpPcGVuU2VzYW1l", &e);
     }
 }

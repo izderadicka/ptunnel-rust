@@ -59,7 +59,7 @@ impl Future for ConnectResponse {
                 };
 
                 if status < 200 || status >= 300 {
-                    return Err(other_error("Invalid status - not 2xx"));
+                    return Err(other_error(&format!("Invalid status - {}",status)));
                 }
 
                 self.status = Status::HeaderOk
@@ -94,7 +94,7 @@ impl Future for ConnectResponse {
 }
 
 impl ProxyTcpStream {
-    pub fn connect(addr: Tunnel, proxy: Option<&Proxy>, handle: Remote) -> IoFuture<Self> {
+    pub fn connect(addr: Tunnel, proxy: Option<&Proxy>, user: Option<String>, handle: Remote) -> IoFuture<Self> {
         let handle2 = handle.clone();
         let addr2 = addr.clone();
         let socket: Box<Future<Item=_, Error=IoError>+Send> = match proxy {
@@ -127,20 +127,25 @@ impl ProxyTcpStream {
                     is_proxied: prox,
                 }
             })
-            .and_then(|stream| stream.write_proxy_connect(addr))
+            .and_then(|stream| stream.write_proxy_connect(addr, user))
             .and_then(|stream| read_proxy_response(stream));
             
 
         Box::new(f)
     }
 
-    fn write_proxy_connect(self, tun: Tunnel) -> IoFuture<Self> {
+    fn write_proxy_connect(self, tun: Tunnel, user: Option<String>) -> IoFuture<Self> {
         let connect_string = if self.is_proxied {
-            format!(
-                "CONNECT {}:{} HTTP/1.1\r\n\r\n",
+            let mut s =format!(
+                "CONNECT {}:{} HTTP/1.1\r\n",
                 &tun.remote_host,
                 tun.remote_port
-            )
+                );
+            if let Some(u) = user {
+                s.push_str(&format!("Proxy-Authorization: Basic {}\r\n", u));
+            };
+            s.push_str("\r\n");
+            s
         } else {
             "".to_owned()
         };

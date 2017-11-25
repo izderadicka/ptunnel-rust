@@ -13,6 +13,7 @@ extern crate tokio_core;
 #[macro_use]
 extern crate tokio_io;
 extern crate tokio_dns;
+extern crate data_encoding;
 
 mod config;
 mod proxy;
@@ -35,12 +36,17 @@ fn main() {
     };
     debug!("Started with following config {:?}", config);
 
-    
+    let user_encoded = config.user.map(|u| u.encoded());
     let mut reactor = Core::new().unwrap();
     let mut servers: Box<Future<Item=(), Error=std::io::Error>> = Box::new(future::ok(()));
     for t in config.tunnels {
-        debug!("Staring tunnel {:?}", t);
-        let server = run_tunnel(reactor.handle(), t, config.proxy.clone());
+        debug!("Staring tunnel {}:{:?} on ", config.local_addr,t);
+        let server = run_tunnel(
+                reactor.handle(), 
+                config.local_addr.clone(), 
+                t, 
+                config.proxy.clone(),
+                user_encoded.clone());
         servers = Box::new(servers.join(server).map(|_| ()));
     }
     

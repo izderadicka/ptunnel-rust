@@ -12,11 +12,13 @@ mod stream;
 
 pub fn run_tunnel(
     reactor_handle: Handle,
+    local_addr: ::std::net::IpAddr,
     tunnel: Tunnel,
     proxy: Option<Proxy>,
+    user: Option<String>
 ) -> Box<Future<Item = (), Error = ::std::io::Error>> {
     // Bind the server's socket
-    let addr = SocketAddr::new("127.0.0.1".parse().unwrap(), tunnel.local_port);
+    let addr = SocketAddr::new(local_addr, tunnel.local_port);
     let tcp = match TcpListener::bind(&addr, &reactor_handle) {
         Ok(l) => l,
         Err(e) => return Box::new(future::err(e)),
@@ -29,6 +31,7 @@ pub fn run_tunnel(
         let remote = ProxyTcpStream::connect(
             tunnel.clone(),
             proxy.as_ref(),
+            user.clone(),
             reactor_handle.remote().clone(),
         ).map_err(move |e| {
             error!(

@@ -20,7 +20,8 @@ Mobile users may connect to different networks, where some (corporate network) h
 
 Proxy configuration
 ===================
-You can supply proxy host:port argument to ptunnel program as `-p host:port` or you can use standard environment variable `https_proxy`, which is in form of URL http://host:port.
+You can supply proxy host:port argument to ptunnel program as `-p host:port` or you can use standard environment variable `https_proxy`, which is in form of URL http://host:port. 
+Program also supports basic authentication with proxy (via `--user` and `--password` program arguments).
 
 Instalation
 ===========

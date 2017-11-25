@@ -4,7 +4,7 @@ ptunnel is using asynchronous I/O (via tokio modules) thus is very effective and
 Typical usage
 =============
 
-Typical usage is for instance is you want to access gmail via corporate proxy - 
+Typical usage is for instance if you want to access gmail via corporate proxy - 
 locally on your machine you run ptunnel as `ptunnel -p your_proxy_host:port 9993:imap.gmail.com:993 5587:smtp.gmail.com.:587` and set your email client to use localhost:9993 as your IMAP server and localhost:5587 as your SMTP server - this approach has one downfall - SSL/TLS - because now SSL certificates will not match the hostname - so you'll need to add security exception to your email client. 
 On linux we can do bit better -  use `/etc/hosts` to map hostnames imap.gmail.com and smtp.gmail.com to local interface:
 ```

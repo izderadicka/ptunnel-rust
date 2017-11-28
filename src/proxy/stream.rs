@@ -150,7 +150,7 @@ impl ProxyTcpStream {
             "".to_owned()
         };
         let f =
-            ::tokio_io::io::write_all(self, connect_string).and_then(|(socket, _req)| Ok(socket));
+            ::tokio_io::io::write_all(self, connect_string).map(|(socket, _req)| socket);
 
         Box::new(f)
     }

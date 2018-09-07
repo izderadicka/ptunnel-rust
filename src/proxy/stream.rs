@@ -1,9 +1,8 @@
 use futures::{Future, Poll};
 use tokio_io::{AsyncRead, AsyncWrite, IoFuture};
-use tokio_core::net::TcpStream;
-use tokio_core::reactor::Remote;
+use tokio::net::TcpStream;
 use std::net::Shutdown;
-use tokio_dns::tcp_connect;
+use tokio_dns::TcpStream as ResolvedTcpStream;
 use std::sync::Arc;
 use std::io::{Error as IoError, ErrorKind as IoErrorKind, Read, Result as IoResult, Write};
 use config::{Proxy, Tunnel};
@@ -94,8 +93,7 @@ impl Future for ConnectResponse {
 }
 
 impl ProxyTcpStream {
-    pub fn connect(addr: Tunnel, proxy: Option<&Proxy>, user: Option<String>, handle: Remote) -> IoFuture<Self> {
-        let handle2 = handle.clone();
+    pub fn connect(addr: Tunnel, proxy: Option<&Proxy>, user: Option<String>) -> IoFuture<Self> {
         let addr2 = addr.clone();
         let socket: Box<Future<Item=_, Error=IoError>+Send> = match proxy {
             None => {
@@ -104,15 +102,15 @@ impl ProxyTcpStream {
                     addr.remote_host,
                     addr.remote_port
                 );
-                Box::new(tcp_connect(&addr, handle).map(|s| (s,false)))
+                Box::new(ResolvedTcpStream::connect(&addr).map(|s| (s,false)))
             }
             Some(p) => {
                 debug!("Connecting via proxy {}:{}", p.host, p.port);
-                Box::new(tcp_connect((&p.host[..], p.port), handle)
+                Box::new(ResolvedTcpStream::connect((&p.host[..], p.port))
                 .map(|s| (s, true))
                 .or_else(move |e| {
                     warn!("Proxy connection failed {:?}, trying direct", e);
-                    tcp_connect(&addr2, handle2).map(|s| (s,false))
+                    ResolvedTcpStream::connect(&addr2).map(|s| (s,false))
                     
                 })
                 

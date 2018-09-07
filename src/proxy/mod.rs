@@ -1,7 +1,7 @@
 use futures::{future, Future, Stream};
 use tokio_io::io;
-use tokio_core::net::TcpListener;
-use tokio_core::reactor::Handle;
+use tokio;
+use tokio::net::TcpListener;
 use std::net::SocketAddr;
 use config::{Proxy, Tunnel};
 use self::stream::{FixedTcpStream, ProxyTcpStream};
@@ -11,28 +11,27 @@ mod stream;
 
 
 pub fn run_tunnel(
-    reactor_handle: Handle,
     local_addr: ::std::net::IpAddr,
     tunnel: Tunnel,
     proxy: Option<Proxy>,
     user: Option<String>
-) -> Box<Future<Item = (), Error = ::std::io::Error>> {
+) -> Box<Future<Item = (), Error = ::std::io::Error>+Send> {
     // Bind the server's socket
     let addr = SocketAddr::new(local_addr, tunnel.local_port);
-    let tcp = match TcpListener::bind(&addr, &reactor_handle) {
+    let tcp = match TcpListener::bind(&addr) {
         Ok(l) => l,
         Err(e) => return Box::new(future::err(e)),
     };
 
     // Iterate incoming connections
-    let server = tcp.incoming().for_each(move |(tcp, client_addr)| {
+    let server = tcp.incoming().for_each(move |tcp| {
+        let client_addr = tcp.peer_addr().unwrap();
         debug!("Client connected from {}", client_addr);
         let tunnel2 = tunnel.clone();
         let remote = ProxyTcpStream::connect(
             tunnel.clone(),
             proxy.as_ref(),
-            user.clone(),
-            reactor_handle.remote().clone(),
+            user.clone()
         ).map_err(move |e| {
             error!(
                 "cannot connect remote end {} because of error {}",
@@ -62,7 +61,7 @@ pub fn run_tunnel(
                     })
                     .map_err(|e| warn!("Tunnel connection error {}", e))
             });
-        reactor_handle.spawn(remote);
+        tokio::spawn(remote);
         Ok(())
     });
 

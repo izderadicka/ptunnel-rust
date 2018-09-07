@@ -9,7 +9,7 @@ extern crate lazy_static;
 extern crate quick_error;
 extern crate url;
 extern crate futures;
-extern crate tokio_core;
+extern crate tokio;
 #[macro_use]
 extern crate tokio_io;
 extern crate tokio_dns;
@@ -22,7 +22,6 @@ use config::{parse_args};
 use proxy::{run_tunnel};
 use std::process::exit;
 use std::io::{self, Write};
-use tokio_core::reactor::Core;
 use futures::{future, Future};
 
 fn main() {
@@ -37,12 +36,10 @@ fn main() {
     debug!("Started with following config {:?}", config);
 
     let user_encoded = config.user.map(|u| u.encoded());
-    let mut reactor = Core::new().unwrap();
-    let mut servers: Box<Future<Item=(), Error=std::io::Error>> = Box::new(future::ok(()));
+    let mut servers: Box<Future<Item=(), Error=std::io::Error>+Send> = Box::new(future::ok(()));
     for t in config.tunnels {
         debug!("Staring tunnel {}:{:?} on ", config.local_addr,t);
         let server = run_tunnel(
-                reactor.handle(), 
                 config.local_addr.clone(), 
                 t, 
                 config.proxy.clone(),
@@ -50,6 +47,6 @@ fn main() {
         servers = Box::new(servers.join(server).map(|_| ()));
     }
     
-    reactor.run(servers).unwrap();
+    tokio::run(servers.map_err(|e| error!("Error in proxy connection {}", e)));
 
 }

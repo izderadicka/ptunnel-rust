@@ -1,6 +1,6 @@
 use clap::{Arg, App};
-use env_logger::{LogBuilder};
-use log::{LogLevelFilter};
+use env_logger::{Builder};
+use log::{LevelFilter};
 use std::str::FromStr;
 use std::env;
 use url::Url;
@@ -83,7 +83,7 @@ impl User {
 
 #[derive(Debug)]
 pub struct Config {
-    pub log_level: LogLevelFilter,
+    pub log_level: LevelFilter,
     pub local_addr: IpAddr,
     pub proxy: Option<Proxy>,
     pub tunnels: Vec<Tunnel>,
@@ -149,12 +149,12 @@ fn create_parser<'a>() -> Parser<'a> {
 
 }
 
-fn config_log_level(level: LogLevelFilter) {
-    let mut log_builder = LogBuilder::new();
+fn config_log_level(level: LevelFilter) {
+    let mut log_builder = Builder::new();
     log_builder.filter(None, level)
-        .filter(Some("tokio_core"), LogLevelFilter::Warn)
-        .filter(Some("mio"), LogLevelFilter::Warn);
-    log_builder.init().unwrap();
+        .filter(Some("tokio"), LevelFilter::Warn)
+        .filter(Some("mio"), LevelFilter::Warn);
+    log_builder.init();
 }
 
 fn parse_proxy(proxy:&str) -> Result<Proxy> {
@@ -212,14 +212,14 @@ pub fn parse_args() -> Result<Config>{
     let args = p.get_matches();
 
     let log_level = if args.is_present("quiet") {
-        LogLevelFilter::Off
+        LevelFilter::Off
     } else {
         match args.occurrences_of("verbose") {
-            0 => LogLevelFilter::Error,
-            1 => LogLevelFilter::Warn,
-            2 => LogLevelFilter::Info,
-            3 => LogLevelFilter::Debug,
-            _ => LogLevelFilter::Trace
+            0 => LevelFilter::Error,
+            1 => LevelFilter::Warn,
+            2 => LevelFilter::Info,
+            3 => LevelFilter::Debug,
+            _ => LevelFilter::Trace
         }
     };
 

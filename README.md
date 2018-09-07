@@ -1,5 +1,5 @@
-**ptunnel** is Rust program that tunnels connections through HTTPS enabled proxy (supporting CONNECT method), thus ptunnel can be used to use any protocol through proxy - for instance IMAP, SMTP, SSH etc.
-ptunnel is using asynchronous I/O (via tokio modules) thus is very effective and can scale well.
+**ptunnel** is Rust program that tunnels connections through HTTPS enabled proxy (supporting CONNECT method), thus ptunnel can be used to sneak any protocol through proxy - for instance IMAP, SMTP, SSH etc (unless proxy is doing additional checks on forwarded protocol - for instance that it is TLS).
+ptunnel is using asynchronous I/O (via tokio module) so it is very effective and can scale well.
 
 Typical usage
 =============
@@ -16,7 +16,7 @@ and use different parameters for ptunnel: `ptunnel -p your_proxy_host:port 9993:
 
 Mobile users
 ============
-Mobile users may connect to different networks, where some (corporate network) have proxy and others (home, public wifis) do not.  ptunnel is able to handle such situations,  because if it cannot connect proxy, it falls back to direct connetion to remote host. Thus you can easily move between networks and ptunnel will handle it.
+Mobile users may connect to different networks, where some (corporate network) have proxy and others (home, public wifis) do not.  ptunnel is able to cope with such situations,  because if it cannot connect to proxy, it falls back to direct connetion to remote host. Thus you can easily move between networks and ptunnel will handle it.
 
 Proxy configuration
 ===================

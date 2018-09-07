@@ -46,7 +46,17 @@ fn main() {
                 user_encoded.clone());
         servers = Box::new(servers.join(server).map(|_| ()));
     }
+
+    let servers = servers.map_err(|e| error!("Error in proxy connection {}", e));
     
-    tokio::run(servers.map_err(|e| error!("Error in proxy connection {}", e)));
+    if config.multithreaded {
+        debug!("Running in thread pool");
+        tokio::run(servers);
+    } else {
+        debug!("Running in current thread");
+        let mut rt = tokio::runtime::current_thread::Runtime::new().unwrap();
+        let _ = rt.block_on(servers); //ignore error
+        
+    }
 
 }

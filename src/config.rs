@@ -87,7 +87,8 @@ pub struct Config {
     pub local_addr: IpAddr,
     pub proxy: Option<Proxy>,
     pub tunnels: Vec<Tunnel>,
-    pub user: Option<User>
+    pub user: Option<User>,
+    pub multithreaded: bool
 }
 
 type Parser<'a> = App<'a, 'a>;
@@ -139,6 +140,11 @@ fn create_parser<'a>() -> Parser<'a> {
         .takes_value(true)
         .help("Proxy user password - for basic authentication to proxy")
         .requires("user")
+    )
+    .arg(Arg::with_name("multithreaded")
+        .short("m")
+        .long("multithreaded")
+        .help("Runs multithreaded - normally not needed")
     )
     .arg(Arg::with_name("tunnel")
         .value_name("LOCAL_POST:REMOTE_HOST:REMOTE_PORT")
@@ -252,7 +258,9 @@ pub fn parse_args() -> Result<Config>{
         Some(name) => Some(User{name:name.into(), password: args.value_of("password").map(|s| s.into())})
     };
 
-   Ok(Config{log_level, proxy, tunnels, local_addr, user})
+    let multithreaded = args.is_present("multithreaded");
+
+   Ok(Config{log_level, proxy, tunnels, local_addr, user, multithreaded})
 }
 
 #[cfg(test)]

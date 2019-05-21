@@ -147,7 +147,7 @@ fn create_parser<'a>() -> Parser<'a> {
         .help("Runs multithreaded - normally not needed")
     )
     .arg(Arg::with_name("tunnel")
-        .value_name("LOCAL_POST:REMOTE_HOST:REMOTE_PORT")
+        .value_name("LOCAL_PORT:REMOTE_HOST:REMOTE_PORT")
         .help("tunnel specfication in form of local_port:remote_host:remote_port")
         .required(true)
         .multiple(true)

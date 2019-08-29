@@ -95,7 +95,7 @@ impl Future for ConnectResponse {
 impl ProxyTcpStream {
     pub fn connect(addr: Tunnel, proxy: Option<&Proxy>, user: Option<String>) -> IoFuture<Self> {
         let addr2 = addr.clone();
-        let socket: Box<Future<Item=_, Error=IoError>+Send> = match proxy {
+        let socket: Box<dyn Future<Item=_, Error=IoError>+Send> = match proxy {
             None => {
                 debug!(
                     "Connecting directly to {}:{}",

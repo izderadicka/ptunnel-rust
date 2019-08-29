@@ -36,7 +36,7 @@ fn main() {
     debug!("Started with following config {:?}", config);
 
     let user_encoded = config.user.map(|u| u.encoded());
-    let mut servers: Box<Future<Item=(), Error=std::io::Error>+Send> = Box::new(future::ok(()));
+    let mut servers: Box<dyn Future<Item=(), Error=std::io::Error>+Send> = Box::new(future::ok(()));
     for t in config.tunnels {
         debug!("Staring tunnel {}:{:?} on ", config.local_addr,t);
         let server = run_tunnel(

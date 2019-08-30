@@ -1,16 +1,16 @@
 [package]
 name = "ptunnel"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Ivan <ivan.zderadicka@gmail.com>"]
 description = "program that tunnels connections through https proxy"
 
 [dependencies]
 log = "0.4"
-env_logger = "0.5"
+env_logger = "0.6"
 clap = "2"
-lazy_static = "1.1"
+lazy_static = "1.4"
 quick-error = "1.2"
-url = "1.7"
+url = "2.1"
 tokio = "0.1"
 tokio-io = "0.1"
 futures = "0.1"

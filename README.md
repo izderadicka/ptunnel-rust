@@ -29,3 +29,8 @@ Clone repository and build with `cargo build --release` (to install cargo and ru
 
 After successful compilation copy binary `target/release/ptunnel` somewhere on your PATH.
 
+License
+=======
+
+This program is licensed under [MIT license](https://opensource.org/licenses/MIT)
+

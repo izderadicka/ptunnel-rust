@@ -15,7 +15,7 @@ pub fn run_tunnel(
     tunnel: Tunnel,
     proxy: Option<Proxy>,
     user: Option<String>
-) -> Box<Future<Item = (), Error = ::std::io::Error>+Send> {
+) -> Box<dyn Future<Item = (), Error = ::std::io::Error>+Send> {
     // Bind the server's socket
     let addr = SocketAddr::new(local_addr, tunnel.local_port);
     let tcp = match TcpListener::bind(&addr) {

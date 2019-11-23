@@ -1,69 +1,79 @@
-use futures::{future, Future, Stream};
-use tokio_io::io;
+use futures::{
+    try_join, 
+    FutureExt,
+    io::{AsyncReadExt, AsyncWriteExt}};
 use tokio;
-use tokio::net::TcpListener;
+use tokio::net::{TcpListener, TcpStream};
 use std::net::SocketAddr;
-use config::{Proxy, Tunnel};
-use self::stream::{FixedTcpStream, ProxyTcpStream};
+use crate::config::{Proxy, Tunnel};
+use stream::ProxyConnector;
 
 mod stream;
 
 
 
-pub fn run_tunnel(
+pub async fn run_tunnel(
     local_addr: ::std::net::IpAddr,
     tunnel: Tunnel,
-    proxy: Option<Proxy>,
+    remote_socket_addr: SocketAddr,
+    proxy: Option<SocketAddr>,
     user: Option<String>
-) -> Box<dyn Future<Item = (), Error = ::std::io::Error>+Send> {
+) -> Result<(),::std::io::Error> {
     // Bind the server's socket
     let addr = SocketAddr::new(local_addr, tunnel.local_port);
-    let tcp = match TcpListener::bind(&addr) {
-        Ok(l) => l,
-        Err(e) => return Box::new(future::err(e)),
-    };
+    let mut listener = TcpListener::bind(&addr).await?;
 
+    
     // Iterate incoming connections
-    let server = tcp.incoming().for_each(move |tcp| {
-        let client_addr = tcp.peer_addr().unwrap();
-        debug!("Client connected from {}", client_addr);
-        let tunnel2 = tunnel.clone();
-        let remote = ProxyTcpStream::connect(
+
+    loop {
+        match listener.accept().await {
+            Ok((socket, client_addr)) => {
+                debug!("Client connected from {}", client_addr);
+                let tunnel2 = tunnel.clone();
+                tokio::spawn(
+                    process_connection(socket, tunnel.clone(), remote_socket_addr, proxy, user.clone())
+                    .map(move |r| 
+                    if let Err(e) = r {
+                        error!("Error in tunnel {:?}: {}", tunnel2, e)
+                    } 
+                    )
+                
+                );
+
+            }
+            Err(e) => error!("Incoming connection error {}", e)
+        }
+    }
+    
+        
+}
+
+
+async fn process_connection(mut socket: TcpStream, 
+    tunnel: Tunnel,
+    remote_socket_addr: std::net::SocketAddr,
+    proxy: Option<SocketAddr>,
+    user: Option<String>
+    ) -> std::io::Result<()>{
+
+    let mut remote_socket = ProxyConnector::connect(
+            remote_socket_addr,
             tunnel.clone(),
-            proxy.as_ref(),
+            proxy,
             user.clone()
-        ).map_err(move |e| {
-            error!(
-                "cannot connect remote end {} because of error {}",
-                tunnel2.remote(),
-                e
-            );
-            // TODO: Close connection?
-        })
-            .and_then(move |remote_socket| {
-                debug!("Created upstream {:?}", remote_socket);
-                let reader = FixedTcpStream::from(tcp);
-                let writer = reader.clone();
+        ).await?;
+            
+    debug!("Created upstream {:?}", remote_socket);
+    
+    let (mut ri, mut wi) = socket.split();
+    let (mut ro, mut wo) = remote_socket.split();
 
-                let remote_reader = remote_socket;
-                let remote_writer = remote_reader.clone();
+    let client_to_server = tokio::io::copy(&mut ri, &mut wo);
+    let server_to_client = tokio::io::copy(&mut ro, &mut wi);
 
-                let copy_forward = io::copy(reader, remote_writer)
-                    .and_then(|(n, _, writer)| io::shutdown(writer).map(move |_| n));
+    try_join!(client_to_server, server_to_client)?;
 
-                let copy_backward = io::copy(remote_reader, writer)
-                    .and_then(|(n, _, writer)| io::shutdown(writer).map(move |_| n));
-
-                copy_forward
-                    .join(copy_backward)
-                    .map(|(up, down)| {
-                        debug!("Uploaded {} bytes and downloaded {} bytes", up, down)
-                    })
-                    .map_err(|e| warn!("Tunnel connection error {}", e))
-            });
-        tokio::spawn(remote);
-        Ok(())
-    });
-
-    Box::new(server)
+    Ok(())
+        
 }

@@ -4,9 +4,11 @@ use log::{LevelFilter};
 use std::str::FromStr;
 use std::env;
 use url::Url;
-use tokio_dns::{ToEndpoint, Endpoint};
 use std::net::IpAddr;
 use data_encoding::BASE64;
+use std::net::{SocketAddr, ToSocketAddrs};
+use std::io;
+
 
 lazy_static! {
     static ref PROGRAM_NAME:&'static str = option_env!("CARGO_PKG_NAME").unwrap_or("ptunnel");
@@ -16,7 +18,7 @@ lazy_static! {
 
 
 quick_error! { 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub enum Error {
     InvalidProxy {
         description("Invalid proxy specification")
@@ -32,6 +34,10 @@ pub enum Error {
     InvalidAddress(err: ::std::net::AddrParseError) {
         from()
     }
+
+    AddressResolution(err: ::std::io::Error) {
+        from()
+    }
 }
 }
 
@@ -44,15 +50,17 @@ pub struct Tunnel {
     pub remote_host: String
 }
 
-impl <'a>ToEndpoint<'a> for &'a Tunnel {
-    fn to_endpoint(self) -> ::std::io::Result<Endpoint<'a>> {
-        Ok(Endpoint::Host(&self.remote_host, self.remote_port))
-    }
+fn resolve_addr<S: AsRef<str>>(host: &S, port: u16) -> io::Result<SocketAddr> {
+    let addr = (host.as_ref(), port);
+        let mut addrs = addr.to_socket_addrs()?;
+        addrs.next().ok_or(io::Error::new(io::ErrorKind::NotFound, "Cannot resolve host name "))
 }
 
+
 impl Tunnel {
-    pub fn remote(&self) -> String {
-        format!("{}:{}", self.remote_host, self.remote_port)
+    pub fn remote_addr(&self) -> io::Result<SocketAddr> {
+        resolve_addr(&self.remote_host, self.remote_port)
+
     }
 }
 
@@ -60,6 +68,13 @@ impl Tunnel {
 pub struct Proxy {
     pub host: String,
     pub port: u16
+}
+
+impl Proxy {
+    pub fn addr(&self) -> io::Result<SocketAddr> {
+        resolve_addr(&self.host, self.port)
+
+    }
 }
 
 #[derive(Debug,Clone)]
@@ -273,7 +288,7 @@ mod tests {
         let parsed = parse_proxy(proxy).unwrap();
         assert_eq!(parsed, Proxy{host: "example.com".into(), port:8080});
 
-        assert_eq!(parse_proxy("spatenka"), Err(Error::InvalidProxy));
+        assert!(parse_proxy("spatenka").is_err());
     }
 
     #[test]
@@ -281,7 +296,7 @@ mod tests {
         let proxy = "http://proxy.example.com:8080";
         assert_eq!(parse_proxy_from_uri(proxy).unwrap(), 
         Proxy{host: "proxy.example.com".into(), port:8080 });
-        assert_eq!(parse_proxy_from_uri("spatenka"), Err(Error::InvalidProxy));
+        assert!(parse_proxy_from_uri("spatenka").is_err());
     }
 
     #[test]

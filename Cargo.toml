@@ -1,18 +1,19 @@
 [package]
 name = "ptunnel"
-version = "0.2.1"
+version = "0.3.0"
 authors = ["Ivan <ivan.zderadicka@gmail.com>"]
 description = "program that tunnels connections through https proxy"
+edition = "2018"
+
 
 [dependencies]
 log = "0.4"
-env_logger = "0.6"
+env_logger = "0.7"
 clap = "2"
 lazy_static = "1.4"
 quick-error = "1.2"
 url = "2.1"
-tokio = "0.1"
-tokio-io = "0.1"
-futures = "0.1"
-tokio-dns-unofficial = "0.4"
+futures = "0.3.1"
 data-encoding = "2.1"
+
+tokio = { version = "=0.2.0-alpha.6", git="https://github.com/tokio-rs/tokio.git", features = ["full"] }

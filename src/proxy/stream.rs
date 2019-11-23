@@ -1,139 +1,55 @@
-use futures::{Future, Poll};
-use tokio_io::{AsyncRead, AsyncWrite, IoFuture};
+use tokio::prelude::*;
+use std::task::{Poll, Context};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
-use std::net::Shutdown;
-use tokio_dns::TcpStream as ResolvedTcpStream;
-use std::sync::Arc;
-use std::io::{Error as IoError, ErrorKind as IoErrorKind, Read, Result as IoResult, Write};
-use config::{Proxy, Tunnel};
+use std::io::{Error as IoError, ErrorKind as IoErrorKind};
+use crate::config::{Tunnel};
 use std::fmt::Debug;
+use std::io;
+use std::net::SocketAddr;
+use std::pin::Pin;
+use futures::{ready, Future};
 
 
 #[derive(Clone)]
-pub struct ProxyTcpStream {
-    inner: Arc<TcpStream>,
-    is_proxied: bool,
-}
+pub struct ProxyConnector;
 
-fn read_proxy_response(s: ProxyTcpStream) -> ConnectResponse {
-    ConnectResponse {
-        stream: Some(s),
-        status: Status::Started,
-    }
-}
+impl ProxyConnector {
 
-#[derive(PartialEq, Debug)]
-enum Status {
-    Started,
-    HeaderOk,
-    FirstCr,
-    FirstLf,
-    SecondCr,
-    Done,
-}
-
-struct ConnectResponse {
-    stream: Option<ProxyTcpStream>,
-    status: Status,
-}
-
-impl Future for ConnectResponse {
-    type Item = ProxyTcpStream;
-    type Error = IoError;
-
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        if self.stream.as_ref().map(|s| s.is_proxied) == Some(true) {
-            let s = self.stream.as_mut().unwrap();
-
-            if self.status == Status::Started {
-                let mut status = [0; 12];
-                try_nb!(s.read_exact(&mut status));
-                // check status code of proxy response
-                let status = match ::std::str::from_utf8(&status) {
-                    Err(_) => return Err(other_error("Invalid status - not UTF8")),
-                    Ok(s) => match str::parse::<u16>(&s[9..12]) {
-                        Ok(n) => n,
-                        Err(_) => return Err(other_error("Invalid status - not number")),
-                    },
-                };
-
-                if status < 200 || status >= 300 {
-                    return Err(other_error(&format!("Invalid status - {}",status)));
-                }
-
-                self.status = Status::HeaderOk
-            }
-
-            loop {
-                let mut next_byte = [0; 1];
-                try_nb!(s.read_exact(&mut next_byte));
-
-                match (&self.status, next_byte[0]) {
-                    (&Status::HeaderOk, b'\r') => self.status = Status::FirstCr,
-                    (&Status::FirstCr, b'\n') => self.status = Status::FirstLf,
-                    (&Status::FirstCr, _) => return Err(other_error("Invalid end of line")),
-                    (&Status::FirstLf, b'\r') => self.status = Status::SecondCr,
-                    (&Status::FirstLf, _) => self.status = Status::HeaderOk,
-                    (&Status::SecondCr, b'\n') => break,
-                    (&Status::SecondCr, _) => return Err(other_error("Invalid end of line")),
-                    (&Status::HeaderOk, _) => (),
-                    (_, _) => {
-                        return Err(other_error(&format!(
-                            "Invalid Header - status {:?} on byte: {:?}",
-                            &self.status,
-                            next_byte[0]
-                        )))
-                    }
-                }
-            }
-        }
-        self.status = Status::Done;
-        Ok(self.stream.take().unwrap().into())
-    }
-}
-
-impl ProxyTcpStream {
-    pub fn connect(addr: Tunnel, proxy: Option<&Proxy>, user: Option<String>) -> IoFuture<Self> {
-        let addr2 = addr.clone();
-        let socket: Box<dyn Future<Item=_, Error=IoError>+Send> = match proxy {
+    pub async fn connect(addr: SocketAddr, 
+        tunnel: Tunnel, 
+        proxy: Option<SocketAddr>, 
+        user: Option<String>) -> io::Result<TcpStream> {
+        let (remote_socket, tunnel_to) = match proxy {
             None => {
                 debug!(
-                    "Connecting directly to {}:{}",
-                    addr.remote_host,
-                    addr.remote_port
+                    "Connecting directly to {}",
+                    addr
                 );
-                Box::new(ResolvedTcpStream::connect(&addr).map(|s| (s,false)))
+              (TcpStream::connect(&addr).await?, None)
             }
             Some(p) => {
-                debug!("Connecting via proxy {}:{}", p.host, p.port);
-                Box::new(ResolvedTcpStream::connect((&p.host[..], p.port))
-                .map(|s| (s, true))
-                .or_else(move |e| {
-                    warn!("Proxy connection failed {:?}, trying direct", e);
-                    ResolvedTcpStream::connect(&addr2).map(|s| (s,false))
+                debug!("Connecting via proxy {}", p);
+                match TcpStream::connect(p).await {
+                    Ok(s) => (s,Some(tunnel)),
+                    Err(e) => {
+                        warn!("Proxy connection failed {:?}, trying direct", e);
+                        (TcpStream::connect(&addr).await?, None)
+                    }  
                     
-                })
-                
-                )
-            }
-        };
-        
-        let f = socket
-            .map(move |(stream, prox) | {
-                ProxyTcpStream {
-                    inner: Arc::new(stream),
-                    is_proxied: prox,
+                    
                 }
-            })
-            .and_then(|stream| stream.write_proxy_connect(addr, user))
-            .and_then(|stream| read_proxy_response(stream));
+                }
+            };
             
-
-        Box::new(f)
+        let half_connected = Self::write_proxy_connect(remote_socket, tunnel_to.clone(), user).await?;
+        Self::read_proxy_response(half_connected, tunnel_to.is_some()).await
     }
 
-    fn write_proxy_connect(self, tun: Tunnel, user: Option<String>) -> IoFuture<Self> {
-        let connect_string = if self.is_proxied {
+    async fn write_proxy_connect(mut stream: TcpStream, tun: Option<Tunnel>, user: Option<String>) -> io::Result<TcpStream> {
+        let connect_string = match tun {
+        
+        Some(tun) => {
             let mut s =format!(
                 "CONNECT {}:{} HTTP/1.1\r\n",
                 &tun.remote_host,
@@ -144,47 +60,112 @@ impl ProxyTcpStream {
             };
             s.push_str("\r\n");
             s
-        } else {
+        } 
+        
+        None => {
             "".to_owned()
+        }
         };
-        let f =
-            ::tokio_io::io::write_all(self, connect_string).map(|(socket, _req)| socket);
+        stream.write_all(connect_string.as_bytes()).await?;
+        Ok(stream)
+    }
 
-        Box::new(f)
+    fn read_proxy_response(s: TcpStream, is_proxied: bool) -> ConnectResponse {
+        ConnectResponse {
+            stream: Some(s),
+            status: Status::Started,
+            is_proxied
+        }
+    }
+
+}
+
+
+#[derive(PartialEq, Debug, Clone, Copy)]
+enum Status {
+    Started,
+    HeaderOk,
+    FirstCr,
+    FirstLf,
+    SecondCr,
+    Done,
+}
+
+struct ConnectResponse {
+    stream: Option<TcpStream>,
+    is_proxied: bool,
+    status: Status,
+}
+
+macro_rules! pin_poll {
+    ($f:expr, $cx:ident) => {
+        let r = &mut $f;
+        let f = Pin::new(r);
+        ready!(Future::poll(f,$cx));
+    };
+}
+
+impl Future for ConnectResponse {
+    type Output = io::Result<TcpStream>;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let Self {is_proxied, stream, status} = &mut *self;
+        if *is_proxied {
+            let s = stream.as_mut().unwrap();
+
+            if *status == Status::Started {
+                let mut header = [0; 12];
+                pin_poll!(s.read_exact(&mut header), cx);
+                
+                // check status code of proxy response
+                let result_code = match ::std::str::from_utf8(&header) {
+                    Err(_) => return Poll::Ready(Err(other_error("Invalid header - not UTF8"))),
+                    Ok(s) => match str::parse::<u16>(&s[9..12]) {
+                        Ok(n) => n,
+                        Err(_) => return Poll::Ready(Err(other_error("Invalid status - not number"))),
+                    },
+                };
+
+                if result_code < 200 || result_code >= 300 {
+                    return Poll::Ready(Err(other_error(&format!("Invalid status - {}",result_code))));
+                }
+
+                *status = Status::HeaderOk
+            }
+
+            loop {
+                let mut next_byte = [0; 1];
+                pin_poll!(s.read_exact(&mut next_byte), cx);
+
+                match (*status, next_byte[0]) {
+                    (Status::HeaderOk, b'\r') => *status = Status::FirstCr,
+                    (Status::FirstCr, b'\n') => *status = Status::FirstLf,
+                    (Status::FirstCr, _) => return Poll::Ready(Err(other_error("Invalid end of line"))),
+                    (Status::FirstLf, b'\r') => *status = Status::SecondCr,
+                    (Status::FirstLf, _) => *status = Status::HeaderOk,
+                    (Status::SecondCr, b'\n') => break,
+                    (Status::SecondCr, _) => return Poll::Ready(Err(other_error("Invalid end of line"))),
+                    (Status::HeaderOk, _) => (),
+                    (_, _) => {
+                        return Poll::Ready(Err(other_error(&format!(
+                            "Invalid Header - status {:?} on byte: {:?}",
+                            &self.status,
+                            next_byte[0]
+                        ))))
+                    }
+                }
+            }
+        }
+        self.status = Status::Done;
+        Poll::Ready(Ok(self.stream.take().unwrap().into()))
     }
 }
 
-impl Debug for ProxyTcpStream {
-    fn fmt(&self, fmt: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        write!(fmt, "{:?}", self.inner)
-    }
+fn other_error(text: &str) -> IoError {
+    IoError::new(IoErrorKind::Other, text)
 }
 
-impl Read for ProxyTcpStream {
-    fn read(&mut self, buf: &mut [u8]) -> IoResult<usize> {
-        (&*self.inner).read(buf)
-    }
-}
-
-impl AsyncRead for ProxyTcpStream {}
-
-impl Write for ProxyTcpStream {
-    fn write(&mut self, buf: &[u8]) -> IoResult<usize> {
-        (&*self.inner).write(buf)
-    }
-
-    fn flush(&mut self) -> IoResult<()> {
-        (&*self.inner).flush()
-    }
-}
-
-impl AsyncWrite for ProxyTcpStream {
-    fn shutdown(&mut self) -> Poll<(), IoError> {
-        self.inner.shutdown(Shutdown::Write)?;
-        Ok(().into())
-    }
-}
-
+/*
 #[derive(Clone)]
 pub struct FixedTcpStream(Arc<TcpStream>);
 
@@ -194,7 +175,7 @@ impl From<TcpStream> for FixedTcpStream {
     }
 }
 
-impl Read for FixedTcpStream {
+impl io::Read for FixedTcpStream {
     fn read(&mut self, buf: &mut [u8]) -> IoResult<usize> {
         (&*self.0).read(buf)
     }
@@ -202,7 +183,7 @@ impl Read for FixedTcpStream {
 
 impl AsyncRead for FixedTcpStream {}
 
-impl Write for FixedTcpStream {
+impl io::Write for FixedTcpStream {
     fn write(&mut self, buf: &[u8]) -> IoResult<usize> {
         (&*self.0).write(buf)
     }
@@ -219,30 +200,11 @@ impl AsyncWrite for FixedTcpStream {
     }
 }
 
-fn other_error(text: &str) -> IoError {
-    IoError::new(IoErrorKind::Other, text)
-}
+
+*/
 
 #[cfg(test)]
 mod tests {
 
-    // #[test]
-    // fn test_buf() {
-    //     use tokio_io::io::{read_until, shutdown, read_exact};
-    //     use tokio_core::net::{TcpStream};
-    //     use tokio_core::reactor::Core;
-    //     use std::net::{SocketAddr};
-    //     use futures::Future;
-
-
-    //     let r = Core::new().unwrap();
-    //     let h = r.handle();
-    //     let a = "127.0.0.1:80".parse().unwrap();
-    //     let mut buf =vec![];
-    //     let f=TcpStream::connect(&a, &h)
-    //     .and_then(|s| {
-    //         read_exact(s, buf)
-    //         });
-
-    // }
+    
 }

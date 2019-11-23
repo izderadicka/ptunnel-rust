@@ -22,7 +22,6 @@ use std::io::{self, Write};
 
 
 fn main() -> Result<(),Box<dyn std::error::Error>> {
-    
     let config=match parse_args() {
         Err(e) => {
             writeln!(&mut io::stderr(), "Arguments error: {:?}",e).unwrap();

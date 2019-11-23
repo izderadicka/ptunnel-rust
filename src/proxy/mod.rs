@@ -1,14 +1,13 @@
 use futures::{
     try_join, 
-    FutureExt,
-    io::{AsyncReadExt, AsyncWriteExt}};
+    FutureExt};
 use tokio;
 use tokio::net::{TcpListener, TcpStream};
 use std::net::SocketAddr;
-use crate::config::{Proxy, Tunnel};
-use stream::ProxyConnector;
+use crate::config::Tunnel;
+use connector::ProxyConnector;
 
-mod stream;
+mod connector;
 
 
 
@@ -73,6 +72,7 @@ async fn process_connection(mut socket: TcpStream,
     let server_to_client = tokio::io::copy(&mut ro, &mut wi);
 
     try_join!(client_to_server, server_to_client)?;
+    debug!("Connection closed {:?}", wi);
 
     Ok(())
         

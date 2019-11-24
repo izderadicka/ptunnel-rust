@@ -40,22 +40,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let user_encoded = config.user.as_ref().map(|u| u.encoded());
-    let proxy_addr = match config.proxy.as_ref() {
-        Some(p) => Some(p.addr()?),
-        None => None,
-    };
 
     rt.block_on(async move {
         let mut servers = vec![];
         for t in config.tunnels {
-            debug!("Staring tunnel {}:{:?} on ", config.local_addr, t);
-            let remote_addr = t.remote_addr().unwrap();
-
+            debug!("Starting tunnel on local address {} {:?}", config.local_addr, t);
             let server = run_tunnel(
                 config.local_addr,
                 t,
-                remote_addr,
-                proxy_addr,
+                config.proxy.clone(),
                 user_encoded.clone(),
             );
 

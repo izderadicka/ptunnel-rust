@@ -1,4 +1,4 @@
-use crate::config::Tunnel;
+use crate::config::{Tunnel, Proxy};
 use connector::ProxyConnector;
 use futures::{
     future::{select, Either},
@@ -13,8 +13,7 @@ mod connector;
 pub async fn run_tunnel(
     local_addr: ::std::net::IpAddr,
     tunnel: Tunnel,
-    remote_socket_addr: SocketAddr,
-    proxy: Option<SocketAddr>,
+    proxy: Option<Proxy>,
     user: Option<String>,
 ) -> Result<(), ::std::io::Error> {
     // Bind the server's socket
@@ -32,8 +31,7 @@ pub async fn run_tunnel(
                     process_connection(
                         socket,
                         tunnel.clone(),
-                        remote_socket_addr,
-                        proxy,
+                        proxy.clone(),
                         user.clone(),
                     )
                     .map(move |r| {
@@ -51,12 +49,11 @@ pub async fn run_tunnel(
 async fn process_connection(
     mut socket: TcpStream,
     tunnel: Tunnel,
-    remote_socket_addr: std::net::SocketAddr,
-    proxy: Option<SocketAddr>,
+    proxy: Option<Proxy>,
     user: Option<String>,
 ) -> std::io::Result<()> {
     let mut remote_socket =
-        ProxyConnector::connect(remote_socket_addr, tunnel.clone(), proxy, user.clone()).await?;
+        ProxyConnector::connect(tunnel.clone(), proxy, user.clone()).await?;
 
     let conn_details = format!("{:?}", remote_socket);
     debug!("Created upstream connection {}", conn_details);

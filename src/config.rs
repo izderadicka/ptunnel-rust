@@ -3,9 +3,7 @@ use data_encoding::BASE64;
 use env_logger::Builder;
 use log::LevelFilter;
 use std::env;
-use std::io;
 use std::net::IpAddr;
-use std::net::{SocketAddr, ToSocketAddrs};
 use std::str::FromStr;
 use url::Url;
 
@@ -47,18 +45,11 @@ pub struct Tunnel {
     pub remote_host: String,
 }
 
-fn resolve_addr<S: AsRef<str>>(host: &S, port: u16) -> io::Result<SocketAddr> {
-    let addr = (host.as_ref(), port);
-    let mut addrs = addr.to_socket_addrs()?;
-    addrs.next().ok_or_else(|| io::Error::new(
-        io::ErrorKind::NotFound,
-        "Cannot resolve host name ",
-    ))
-}
+pub type RawSocketAddr<'a> = (&'a str, u16); 
 
 impl Tunnel {
-    pub fn remote_addr(&self) -> io::Result<SocketAddr> {
-        resolve_addr(&self.remote_host, self.remote_port)
+    pub fn remote_addr(&self) -> RawSocketAddr<'_> {
+        (self.remote_host.as_str(), self.remote_port)
     }
 }
 
@@ -69,8 +60,8 @@ pub struct Proxy {
 }
 
 impl Proxy {
-    pub fn addr(&self) -> io::Result<SocketAddr> {
-        resolve_addr(&self.host, self.port)
+    pub fn addr(&self) -> RawSocketAddr<'_> {
+        (self.host.as_str(), self.port)
     }
 }
 

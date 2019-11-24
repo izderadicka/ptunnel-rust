@@ -1,7 +1,6 @@
-use crate::config::Tunnel;
+use crate::config::{Tunnel, Proxy};
 use std::fmt::Debug;
 use std::io;
-use std::net::SocketAddr;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
@@ -10,90 +9,87 @@ pub struct ProxyConnector;
 
 impl ProxyConnector {
     pub async fn connect(
-        addr: SocketAddr,
         tunnel: Tunnel,
-        proxy: Option<SocketAddr>,
+        proxy: Option<Proxy>,
         user: Option<String>,
     ) -> io::Result<TcpStream> {
-        let (remote_socket, tunnel_to) = match proxy {
+        let (mut remote_socket, tunnel_through) = match proxy {
             None => {
-                debug!("Connecting directly to {}", addr);
-                (TcpStream::connect(&addr).await?, None)
+                debug!("Connecting directly to {:?}", tunnel.remote_addr());
+                (TcpStream::connect(tunnel.remote_addr()).await?, None)
             }
             Some(p) => {
-                debug!("Connecting via proxy {}", p);
-                match TcpStream::connect(p).await {
+                debug!("Connecting via proxy {:?}", p);
+                match TcpStream::connect(p.addr()).await {
                     Ok(s) => (s, Some(tunnel)),
                     Err(e) => {
                         warn!("Proxy connection failed {:?}, trying direct", e);
-                        (TcpStream::connect(&addr).await?, None)
+                        (TcpStream::connect(tunnel.remote_addr()).await?, None)
                     }
                 }
             }
         };
+        if let Some(tunnel) = tunnel_through { 
+            Self::write_proxy_connect(&mut remote_socket, tunnel, user).await?;
+            Self::read_proxy_response(&mut remote_socket).await?
+        }
 
-        let half_connected =
-            Self::write_proxy_connect(remote_socket, tunnel_to.clone(), user).await?;
-        Self::read_proxy_response(half_connected, tunnel_to.is_some()).await
+        Ok(remote_socket)
     }
 
     async fn write_proxy_connect(
-        mut stream: TcpStream,
-        tunnel: Option<Tunnel>,
+        stream: &mut TcpStream,
+        tunnel: Tunnel,
         user: Option<String>,
-    ) -> io::Result<TcpStream> {
-        if let Some(tun) = tunnel {
-            let mut s = format!(
-                "CONNECT {}:{} HTTP/1.1\r\n",
-                &tun.remote_host, tun.remote_port
-            );
-            if let Some(u) = user {
-                s.push_str(&format!("Proxy-Authorization: Basic {}\r\n", u));
-            };
-            s.push_str("\r\n");
-            stream.write_all(s.as_bytes()).await?;
+    ) -> io::Result<()> {
+        let mut s = format!(
+            "CONNECT {}:{} HTTP/1.1\r\n",
+            &tunnel.remote_host, tunnel.remote_port
+        );
+        if let Some(u) = user {
+            s.push_str(&format!("Proxy-Authorization: Basic {}\r\n", u));
         };
-
-        Ok(stream)
+        s.push_str("\r\n");
+        stream.write_all(s.as_bytes()).await?;
+        Ok(())
     }
 
-    async fn read_proxy_response(mut stream: TcpStream, is_proxied: bool) -> io::Result<TcpStream> {
-        if is_proxied {
-            let mut header = [0; 12];
-            stream.read_exact(&mut header).await?;
+    async fn read_proxy_response(stream: &mut TcpStream) -> io::Result<()> {
+        let mut header = [0; 12];
+        stream.read_exact(&mut header).await?;
 
-            // check status code of proxy response
-            let result_code = match ::std::str::from_utf8(&header) {
-                Err(_) => return Err(other_error("Invalid header - not UTF8")),
-                Ok(s) => match str::parse::<u16>(&s[9..12]) {
-                    Ok(n) => n,
-                    Err(_) => return Err(other_error("Invalid status - not number")),
-                },
-            };
+        // check status code of proxy response
+        let result_code = match ::std::str::from_utf8(&header) {
+            Err(_) => return Err(other_error("Invalid header - not UTF8")),
+            Ok(s) => match str::parse::<u16>(&s[9..12]) {
+                Ok(n) => n,
+                Err(_) => return Err(other_error("Invalid status - not number")),
+            },
+        };
 
-            if result_code < 200 || result_code >= 300 {
-                return Err(other_error(&format!("Invalid status - {}", result_code)));
-            }
+        if result_code < 200 || result_code >= 300 {
+            return Err(other_error(&format!("Invalid status - {}", result_code)));
+        }
 
-            let mut status = Status::HeaderOk;
+        let mut status = Status::HeaderOk;
 
-            loop {
-                let mut next_byte = [0; 1];
-                stream.read_exact(&mut next_byte).await?;
+        loop {
+            let mut next_byte = [0; 1];
+            stream.read_exact(&mut next_byte).await?;
 
-                match (status, next_byte[0]) {
-                    (Status::HeaderOk, b'\r') => status = Status::FirstCr,
-                    (Status::FirstCr, b'\n') => status = Status::FirstLf,
-                    (Status::FirstCr, _) => return Err(other_error("Invalid end of line")),
-                    (Status::FirstLf, b'\r') => status = Status::SecondCr,
-                    (Status::FirstLf, _) => status = Status::HeaderOk,
-                    (Status::SecondCr, b'\n') => break,
-                    (Status::SecondCr, _) => return Err(other_error("Invalid end of line")),
-                    (Status::HeaderOk, _) => (),
-                }
+            match (status, next_byte[0]) {
+                (Status::HeaderOk, b'\r') => status = Status::FirstCr,
+                (Status::FirstCr, b'\n') => status = Status::FirstLf,
+                (Status::FirstCr, _) => return Err(other_error("Invalid end of line")),
+                (Status::FirstLf, b'\r') => status = Status::SecondCr,
+                (Status::FirstLf, _) => status = Status::HeaderOk,
+                (Status::SecondCr, b'\n') => break,
+                (Status::SecondCr, _) => return Err(other_error("Invalid end of line")),
+                (Status::HeaderOk, _) => (),
             }
         }
-        Ok(stream)
+        
+        Ok(())
     }
 }
 

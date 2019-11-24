@@ -1,6 +1,10 @@
 use futures::{
-    try_join, 
-    FutureExt};
+    FutureExt,
+    future:: {
+        select,
+        Either
+    }
+};
 use tokio;
 use tokio::net::{TcpListener, TcpStream};
 use std::net::SocketAddr;
@@ -62,18 +66,23 @@ async fn process_connection(mut socket: TcpStream,
             proxy,
             user.clone()
         ).await?;
-            
-    debug!("Created upstream {:?}", remote_socket);
+        
+    let conn_details = format!("{:?}", remote_socket) ;   
+    debug!("Created upstream connection {}", conn_details);
     
     let (mut ri, mut wi) = socket.split();
     let (mut ro, mut wo) = remote_socket.split();
 
     let client_to_server = tokio::io::copy(&mut ri, &mut wo);
     let server_to_client = tokio::io::copy(&mut ro, &mut wi);
+    debug!("Connection closed {}", conn_details);
+    let res = select(client_to_server, server_to_client).await;
+    match res {
+        Either::Left((Err(e), _)) => Err(e),
+        Either::Right((Err(e), _)) => Err(e),
+        _ => Ok(())
+    }
+    
 
-    try_join!(client_to_server, server_to_client)?;
-    debug!("Connection closed {:?}", wi);
-
-    Ok(())
         
 }

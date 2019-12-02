@@ -37,8 +37,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "bytes"
-version = "0.5.0"
-source = "git+https://github.com/tokio-rs/bytes#44fb2061481d254f94ad9902df1dcb1bda2cd8d8"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "cfg-if"
@@ -375,7 +375,7 @@ dependencies = [
  "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "quick-error 1.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "tokio 0.2.0-alpha.6 (git+https://github.com/tokio-rs/tokio.git)",
+ "tokio 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "url 2.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -484,10 +484,10 @@ dependencies = [
 
 [[package]]
 name = "tokio"
-version = "0.2.0-alpha.6"
-source = "git+https://github.com/tokio-rs/tokio.git#3ecaa6d91cef271b4c079a2e28bc3270280bcee6"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "bytes 0.5.0 (git+https://github.com/tokio-rs/bytes)",
+ "bytes 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "fnv 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures-core 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -500,14 +500,14 @@ dependencies = [
  "pin-project-lite 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "signal-hook-registry 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "slab 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "tokio-macros 0.2.0-alpha.6 (git+https://github.com/tokio-rs/tokio.git)",
+ "tokio-macros 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "winapi 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "tokio-macros"
-version = "0.2.0-alpha.6"
-source = "git+https://github.com/tokio-rs/tokio.git#3ecaa6d91cef271b4c079a2e28bc3270280bcee6"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "quote 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "syn 1.0.8 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -615,7 +615,7 @@ dependencies = [
 "checksum arc-swap 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)" = "d7b8a9123b8027467bce0099fe556c628a53c8d83df0507084c31e9ba2e39aff"
 "checksum atty 0.2.13 (registry+https://github.com/rust-lang/crates.io-index)" = "1803c647a3ec87095e7ae7acfca019e98de5ec9a7d01343f611cf3152ed71a90"
 "checksum bitflags 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "cf1de2fe8c75bc145a2f577add951f8134889b4795d47466a54a5c846d691693"
-"checksum bytes 0.5.0 (git+https://github.com/tokio-rs/bytes)" = "<none>"
+"checksum bytes 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)" = "1c85319f157e4e26c703678e68e26ab71a46c0199286fa670b21cc9fec13d895"
 "checksum cfg-if 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)" = "b486ce3ccf7ffd79fdeb678eac06a9e6c09fc88d33836340becb8fffe87c5e33"
 "checksum clap 2.33.0 (registry+https://github.com/rust-lang/crates.io-index)" = "5067f5bb2d80ef5d68b4c87db81601f0b75bca627bc2ef76b141d7b846a3c6d9"
 "checksum data-encoding 2.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "f4f47ca1860a761136924ddd2422ba77b2ea54fe8cc75b9040804a0d9d32ad97"
@@ -669,8 +669,8 @@ dependencies = [
 "checksum termcolor 1.0.5 (registry+https://github.com/rust-lang/crates.io-index)" = "96d6098003bde162e4277c70665bd87c326f5a0c3f3fbfb285787fa482d54e6e"
 "checksum textwrap 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)" = "d326610f408c7a4eb6f51c37c330e496b08506c9457c9d34287ecc38809fb060"
 "checksum thread_local 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)" = "c6b53e329000edc2b34dbe8545fd20e55a333362d0a321909685a19bd28c3f1b"
-"checksum tokio 0.2.0-alpha.6 (git+https://github.com/tokio-rs/tokio.git)" = "<none>"
-"checksum tokio-macros 0.2.0-alpha.6 (git+https://github.com/tokio-rs/tokio.git)" = "<none>"
+"checksum tokio 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "2e765bf9f550bd9b8a970633ca3b56b8120c4b6c5dcbe26a93744cb02fee4b17"
+"checksum tokio-macros 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "d5795a71419535c6dcecc9b6ca95bdd3c2d6142f7e8343d7beb9923f129aa87e"
 "checksum unicode-bidi 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)" = "49f2bd0c6468a8230e1db229cff8029217cf623c767ea5d60bfbd42729ea54d5"
 "checksum unicode-normalization 0.1.11 (registry+https://github.com/rust-lang/crates.io-index)" = "b561e267b2326bb4cebfc0ef9e68355c7abe6c6f522aeac2f5bf95d56c59bdcf"
 "checksum unicode-width 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)" = "7007dbd421b92cc6e28410fe7362e2e0a2503394908f417b68ec8d1c364c4e20"

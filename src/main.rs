@@ -19,6 +19,10 @@ use config::parse_args;
 use proxy::run_tunnel;
 use std::io::{self, Write};
 use std::process::exit;
+use futures::{
+    FutureExt,
+    future
+};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = match parse_args() {
@@ -50,7 +54,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 t,
                 config.proxy.clone(),
                 user_encoded.clone(),
-            );
+            ).then(|r| {
+                if let Err(e) = r {
+                    error!("Error when creating tunnel: {}", e)
+                }
+                future::ready(())
+            });
 
             servers.push(server);
         }

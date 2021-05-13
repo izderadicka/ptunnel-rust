@@ -1,8 +1,12 @@
-FROM rust:1.52.1-slim
+FROM rust:1.52.1-slim as builder
 
 WORKDIR /ptunnel
 
 COPY . .
 
 RUN cargo build --release
-ENV PATH="/ptunnel/target/release:${PATH}"
+
+FROM ubuntu
+
+COPY --from=builder /ptunnel/target/release /ptunnel
+ENV PATH="/ptunnel:${PATH}"

@@ -1,4 +1,4 @@
-use clap::{App, Arg};
+use clap::{Command, Arg, ArgAction};
 use data_encoding::BASE64;
 use env_logger::Builder;
 use log::LevelFilter;
@@ -7,10 +7,6 @@ use std::net::IpAddr;
 use std::str::FromStr;
 use url::Url;
 
-lazy_static! {
-    static ref PROGRAM_NAME: &'static str = option_env!("CARGO_PKG_NAME").unwrap_or("ptunnel");
-    static ref PROGRAM_VERSION: Option<&'static str> = option_env!("CARGO_PKG_VERSION");
-}
 
 quick_error! {
 #[derive(Debug)]
@@ -93,66 +89,64 @@ pub struct Config {
     pub multithreaded: bool,
 }
 
-type Parser<'a> = App<'a, 'a>;
 
-fn create_parser<'a>() -> Parser<'a> {
-    let mut arg_parser = App::new(*PROGRAM_NAME);
-    if let Some(ver) = *PROGRAM_VERSION {
-        arg_parser = arg_parser.version(ver);
-    }
+fn create_parser<'a>() -> Command {
+    let arg_parser = Command::new(crate_name!())
+    .version(crate_version!());
 
     arg_parser
     .author(crate_authors!())
     .about(crate_description!())
     .arg(
-        Arg::with_name("quiet")
-        .short("q")
+        Arg::new("quiet")
+        .short('q')
         .long("quiet")
+        .conflicts_with("verbose")
         .help("absolutely quite - logging off even for errors")
         )
-    .arg(Arg::with_name("verbose")
-        .short("v")
+    .arg(Arg::new("verbose")
+        .short('v')
         .long("verbose")
-        .multiple(true)
+        .action(ArgAction::Count)
         .conflicts_with("quiet")
         .help("verbosity of logging - can be used multiple times to increase verbosity")
         )
-    .arg(Arg::with_name("listen")
-        .short("l")
+    .arg(Arg::new("listen")
+        .short('l')
         .long("listen")
-        .takes_value(true)
+        .num_args(1)
         .help("local address to listen on - default is 127.0.0.1")
     )
-    .arg(Arg::with_name("proxy")
-        .short("p")
+    .arg(Arg::new("proxy")
+        .short('p')
         .long("proxy")
-        .takes_value(true)
+        .num_args(1)
         .value_name("HOST:PORT")
         .help("https proxy (accepting CONNECT method), specify as host:port, if not specified https_proxy environment var is used")
     )
-    .arg(Arg::with_name("user")
-        .short("U")
+    .arg(Arg::new("user")
+        .short('U')
         .long("user")
-        .takes_value(true)
+        .num_args(1)
         .help("Proxy username - for basic authentication to proxy")
     )
-    .arg(Arg::with_name("password")
-        .short("P")
+    .arg(Arg::new("password")
+        .short('P')
         .long("password")
-        .takes_value(true)
+        .num_args(1)
         .help("Proxy user password - for basic authentication to proxy")
         .requires("user")
     )
-    .arg(Arg::with_name("multithreaded")
-        .short("m")
+    .arg(Arg::new("multithreaded")
+        .short('m')
         .long("multithreaded")
         .help("Runs multithreaded - normally not needed")
     )
-    .arg(Arg::with_name("tunnel")
+    .arg(Arg::new("tunnel")
         .value_name("LOCAL_PORT:REMOTE_HOST:REMOTE_PORT")
         .help("tunnel specfication in form of local_port:remote_host:remote_port")
         .required(true)
-        .multiple(true)
+        .num_args(1..65536)
         )
 }
 
@@ -219,10 +213,10 @@ pub fn parse_args() -> Result<Config> {
     let p = create_parser();
     let args = p.get_matches();
 
-    let log_level = if args.is_present("quiet") {
+    let log_level = if args.contains_id("quiet") {
         LevelFilter::Off
     } else {
-        match args.occurrences_of("verbose") {
+        match args.get_count("verbose") {
             0 => LevelFilter::Error,
             1 => LevelFilter::Warn,
             2 => LevelFilter::Info,
@@ -234,12 +228,12 @@ pub fn parse_args() -> Result<Config> {
     config_log_level(log_level);
     debug!("Arguments are {:?}", args);
 
-    let local_addr = match args.value_of("listen") {
+    let local_addr = match args.get_one::<String>("listen") {
         None => "127.0.0.1".parse().unwrap(),
         Some(s) => s.parse()?,
     };
 
-    let proxy = match args.value_of("proxy") {
+    let proxy = match args.get_one::<String>("proxy") {
         Some(p) => Some(parse_proxy(p)?),
         None => get_any_env_var(&["https_proxy", "HTTPS_PROXY"]).and_then(|p| {
             parse_proxy_from_uri(&p)
@@ -252,19 +246,19 @@ pub fn parse_args() -> Result<Config> {
     };
 
     let mut tunnels = vec![];
-    for t in args.values_of("tunnel").unwrap() {
+    for t in args.get_many::<String>("tunnel").unwrap() {
         tunnels.push(parse_tunnel(t)?)
     }
 
-    let user = match args.value_of("user") {
+    let user = match args.get_one::<String>("user") {
         None => None,
         Some(name) => Some(User {
             name: name.into(),
-            password: args.value_of("password").map(|s| s.into()),
+            password: args.get_one::<String>("password").map(|s| s.into()),
         }),
     };
 
-    let multithreaded = args.is_present("multithreaded");
+    let multithreaded = args.contains_id("multithreaded");
 
     Ok(Config {
         log_level,

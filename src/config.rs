@@ -6,33 +6,7 @@ use std::env;
 use std::net::IpAddr;
 use std::str::FromStr;
 use url::Url;
-
-
-quick_error! {
-#[derive(Debug)]
-pub enum Error {
-    InvalidProxy {
-        description("Invalid proxy specification")
-    }
-    InvalidTunnel {
-        description("Invalid tunnel specification")
-    }
-
-    InvalidPort(err: ::std::num::ParseIntError) {
-        from()
-    }
-
-    InvalidAddress(err: ::std::net::AddrParseError) {
-        from()
-    }
-
-    AddressResolution(err: ::std::io::Error) {
-        from()
-    }
-}
-}
-
-type Result<T> = ::std::result::Result<T, Error>;
+use crate::error::{Error, Result};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Tunnel {

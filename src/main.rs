@@ -3,8 +3,6 @@ extern crate log;
 extern crate env_logger;
 #[macro_use]
 extern crate clap;
-#[macro_use]
-extern crate quick_error;
 extern crate data_encoding;
 extern crate futures;
 extern crate tokio;
@@ -12,6 +10,7 @@ extern crate url;
 
 mod config;
 mod proxy;
+mod error;
 
 use config::parse_args;
 use proxy::run_tunnel;

@@ -56,11 +56,10 @@ async fn process_connection(
     let (mut ri, mut wi) = socket.split();
     let (mut ro, mut wo) = remote_socket.split();
 
-    let client_to_server = tokio::io::copy(&mut ri, &mut wo);
-    pin!(client_to_server);
-    let server_to_client = tokio::io::copy(&mut ro, &mut wi);
-    pin!(server_to_client);
-
+    pin! {
+        let client_to_server = tokio::io::copy(&mut ri, &mut wo);
+        let server_to_client = tokio::io::copy(&mut ro, &mut wi);
+    }
     let res = select(client_to_server, server_to_client).await;
     debug!("Connection closed {}", conn_details);
     match res {

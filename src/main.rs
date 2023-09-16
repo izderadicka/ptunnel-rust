@@ -17,7 +17,6 @@ mod proxy;
 
 use config::parse_args;
 use proxy::run_tunnel;
-use std::io::{self, Write};
 use std::process::exit;
 use futures::{
     FutureExt,
@@ -27,7 +26,7 @@ use futures::{
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = match parse_args() {
         Err(e) => {
-            writeln!(&mut io::stderr(), "Arguments error: {:?}", e).unwrap();
+            eprintln!("Arguments error: {:?}", e);
             exit(1)
         }
         Ok(c) => c,

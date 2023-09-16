@@ -1,6 +1,6 @@
 [package]
 name = "ptunnel"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["Ivan <ivan.zderadicka@gmail.com>"]
 description = "program that tunnels connections through https proxy"
 edition = "2018"
@@ -8,12 +8,12 @@ edition = "2018"
 
 [dependencies]
 log = "0.4"
-env_logger = "0.7"
+env_logger = "0.10.0"
 clap = "2"
 lazy_static = "1.4"
 quick-error = "1.2"
 url = "2.1"
 futures = "0.3.1"
-data-encoding = "2.1"
+data-encoding = "2.4.0"
 
-tokio = { version = "=0.2.2", features = ["full"] }
+tokio = { version = "0.2.25", features = ["full"] }

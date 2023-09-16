@@ -1,25 +1,15 @@
 #[macro_use]
 extern crate log;
-extern crate env_logger;
-#[macro_use]
-extern crate clap;
-extern crate data_encoding;
-extern crate futures;
-extern crate tokio;
-extern crate url;
-
-mod config;
-mod proxy;
-mod error;
 
 use config::parse_args;
+use futures::{future, FutureExt};
 use proxy::run_tunnel;
-use tokio::runtime;
 use std::process::exit;
-use futures::{
-    FutureExt,
-    future
-};
+use tokio::runtime;
+
+mod config;
+mod error;
+mod proxy;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = match parse_args() {
@@ -36,7 +26,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         runtime::Runtime::new()?
     } else {
         debug!("Running in current thread");
-        runtime::Builder::new_current_thread().enable_all().build()?
+        runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()?
     };
 
     let user_encoded = config.user.as_ref().map(|u| u.encoded());
@@ -44,13 +36,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     rt.block_on(async move {
         let mut servers = vec![];
         for t in config.tunnels {
-            debug!("Starting tunnel on local address {} {:?}", config.local_addr, t);
+            debug!(
+                "Starting tunnel on local address {} {:?}",
+                config.local_addr, t
+            );
             let server = run_tunnel(
                 config.local_addr,
                 t,
                 config.proxy.clone(),
                 user_encoded.clone(),
-            ).then(|r| {
+            )
+            .then(|r| {
                 if let Err(e) = r {
                     error!("Error when creating tunnel: {}", e)
                 }

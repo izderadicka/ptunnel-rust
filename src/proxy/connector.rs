@@ -1,4 +1,4 @@
-use crate::config::{Tunnel, Proxy};
+use crate::config::{Proxy, Tunnel};
 use std::fmt::Debug;
 use std::io;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -29,7 +29,7 @@ impl ProxyConnector {
                 }
             }
         };
-        if let Some(tunnel) = tunnel_through { 
+        if let Some(tunnel) = tunnel_through {
             Self::write_proxy_connect(&mut remote_socket, tunnel, user).await?;
             Self::read_proxy_response(&mut remote_socket).await?
         }
@@ -88,7 +88,7 @@ impl ProxyConnector {
                 (Status::HeaderOk, _) => (),
             }
         }
-        
+
         Ok(())
     }
 }

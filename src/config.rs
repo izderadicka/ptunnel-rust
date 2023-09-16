@@ -1,4 +1,5 @@
-use clap::{Command, Arg, ArgAction};
+use crate::error::{Error, Result};
+use clap::{crate_authors, crate_description, crate_name, crate_version, Arg, ArgAction, Command};
 use data_encoding::BASE64;
 use env_logger::Builder;
 use log::LevelFilter;
@@ -6,7 +7,6 @@ use std::env;
 use std::net::IpAddr;
 use std::str::FromStr;
 use url::Url;
-use crate::error::{Error, Result};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Tunnel {
@@ -15,7 +15,7 @@ pub struct Tunnel {
     pub remote_host: String,
 }
 
-pub type RawSocketAddr<'a> = (&'a str, u16); 
+pub type RawSocketAddr<'a> = (&'a str, u16);
 
 impl Tunnel {
     pub fn remote_addr(&self) -> RawSocketAddr<'_> {
@@ -63,10 +63,8 @@ pub struct Config {
     pub multithreaded: bool,
 }
 
-
 fn create_parser<'a>() -> Command {
-    let arg_parser = Command::new(crate_name!())
-    .version(crate_version!());
+    let arg_parser = Command::new(crate_name!()).version(crate_version!());
 
     arg_parser
     .author(crate_authors!())

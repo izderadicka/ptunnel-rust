@@ -1,12 +1,12 @@
-use crate::config::{Tunnel, Proxy};
+use crate::config::{Proxy, Tunnel};
 use connector::ProxyConnector;
 use futures::{
     future::{select, Either},
     FutureExt,
 };
 use std::net::SocketAddr;
-use tokio::{self, pin};
 use tokio::net::{TcpListener, TcpStream};
+use tokio::{self, pin};
 
 mod connector;
 
@@ -18,7 +18,7 @@ pub async fn run_tunnel(
 ) -> Result<(), ::std::io::Error> {
     // Bind the server's socket
     let addr = SocketAddr::new(local_addr, tunnel.local_port);
-    let mut listener = TcpListener::bind(&addr).await?;
+    let listener = TcpListener::bind(&addr).await?;
 
     // Iterate incoming connections
 
@@ -28,17 +28,13 @@ pub async fn run_tunnel(
                 debug!("Client connected from {}", client_addr);
                 let tunnel2 = tunnel.clone();
                 tokio::spawn(
-                    process_connection(
-                        socket,
-                        tunnel.clone(),
-                        proxy.clone(),
-                        user.clone(),
-                    )
-                    .map(move |r| {
-                        if let Err(e) = r {
-                            error!("Error in tunnel {:?}: {}", tunnel2, e)
-                        }
-                    }),
+                    process_connection(socket, tunnel.clone(), proxy.clone(), user.clone()).map(
+                        move |r| {
+                            if let Err(e) = r {
+                                error!("Error in tunnel {:?}: {}", tunnel2, e)
+                            }
+                        },
+                    ),
                 );
             }
             Err(e) => error!("Incoming connection error {}", e),
@@ -52,8 +48,7 @@ async fn process_connection(
     proxy: Option<Proxy>,
     user: Option<String>,
 ) -> std::io::Result<()> {
-    let mut remote_socket =
-        ProxyConnector::connect(tunnel.clone(), proxy, user.clone()).await?;
+    let mut remote_socket = ProxyConnector::connect(tunnel.clone(), proxy, user.clone()).await?;
 
     let conn_details = format!("{:?}", remote_socket);
     debug!("Created upstream connection {}", conn_details);
@@ -65,7 +60,7 @@ async fn process_connection(
     pin!(client_to_server);
     let server_to_client = tokio::io::copy(&mut ro, &mut wi);
     pin!(server_to_client);
-    
+
     let res = select(client_to_server, server_to_client).await;
     debug!("Connection closed {}", conn_details);
     match res {

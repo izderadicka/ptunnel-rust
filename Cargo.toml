@@ -3,17 +3,17 @@ name = "ptunnel"
 version = "0.4.0"
 authors = ["Ivan <ivan.zderadicka@gmail.com>"]
 description = "program that tunnels connections through https proxy"
-edition = "2018"
+edition = "2021"
+rust_version ="1.72"
 
 
 [dependencies]
 log = "0.4"
 env_logger = "0.10.0"
 clap = { version="4.4.3", features=["cargo"] }
-quick-error = "1.2"
 url = "2.1"
 futures = "0.3.1"
 data-encoding = "2.4.0"
 
-tokio = { version = "1.32.0", features = ["full"] }
+tokio = { version = "1.32.0", features = ["rt", "rt-multi-thread", "net", "io-util"] }
 thiserror = "1.0.48"

@@ -5,7 +5,7 @@ use futures::{
     FutureExt,
 };
 use std::net::SocketAddr;
-use tokio;
+use tokio::{self, pin};
 use tokio::net::{TcpListener, TcpStream};
 
 mod connector;
@@ -62,9 +62,12 @@ async fn process_connection(
     let (mut ro, mut wo) = remote_socket.split();
 
     let client_to_server = tokio::io::copy(&mut ri, &mut wo);
+    pin!(client_to_server);
     let server_to_client = tokio::io::copy(&mut ro, &mut wi);
-    debug!("Connection closed {}", conn_details);
+    pin!(server_to_client);
+    
     let res = select(client_to_server, server_to_client).await;
+    debug!("Connection closed {}", conn_details);
     match res {
         Either::Left((Err(e), _)) => Err(e),
         Either::Right((Err(e), _)) => Err(e),

@@ -17,6 +17,7 @@ mod proxy;
 
 use config::parse_args;
 use proxy::run_tunnel;
+use tokio::runtime;
 use std::process::exit;
 use futures::{
     FutureExt,
@@ -33,13 +34,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     debug!("Started with following config {:?}", config);
 
-    let mut builder = tokio::runtime::Builder::new();
-    let mut rt = if config.multithreaded {
+    let rt = if config.multithreaded {
         debug!("Running in thread pool");
-        builder.threaded_scheduler().enable_all().build()?
+        runtime::Runtime::new()?
     } else {
         debug!("Running in current thread");
-        builder.basic_scheduler().enable_all().build()?
+        runtime::Builder::new_current_thread().enable_all().build()?
     };
 
     let user_encoded = config.user.as_ref().map(|u| u.encoded());
